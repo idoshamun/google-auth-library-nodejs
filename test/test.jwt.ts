@@ -15,13 +15,13 @@
 import * as assert from 'assert';
 import {describe, it, beforeEach, afterEach} from 'mocha';
 import * as fs from 'fs';
-import * as jws from 'jws';
 import * as nock from 'nock';
 import * as sinon from 'sinon';
 
 import {GoogleAuth, JWT} from '../src';
 import {CredentialRequest, JWTInput} from '../src/auth/credentials';
 import * as jwtaccess from '../src/auth/jwtaccess';
+import * as fjwt from 'fast-jwt';
 
 describe('jwt', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -29,6 +29,8 @@ describe('jwt', () => {
   const PEM_PATH = './test/fixtures/private.pem';
   const PEM_CONTENTS = fs.readFileSync(PEM_PATH, 'utf8');
   const P12_PATH = './test/fixtures/key.p12';
+
+  const jwtDecoder = fjwt.createDecoder({complete: true});
 
   nock.disableNetConnect();
 
@@ -200,7 +202,7 @@ describe('jwt', () => {
     const testUri = 'http:/example.com/my_test_service';
     const got = await jwt.getRequestHeaders(testUri);
     assert.notStrictEqual(null, got, 'the creds should be present');
-    const decoded = jws.decode(got.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(got.Authorization.replace('Bearer ', ''));
     assert.deepStrictEqual({alg: 'RS256', typ: 'JWT'}, decoded.header);
     const payload = decoded.payload;
     assert.strictEqual(email, payload.iss);
@@ -221,7 +223,7 @@ describe('jwt', () => {
     const testUri = 'http:/example.com/my_test_service';
     const got = await jwt.getRequestHeaders(testUri);
     assert.notStrictEqual(null, got, 'the creds should be present');
-    const decoded = jws.decode(got.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(got.Authorization.replace('Bearer ', ''));
     assert.deepStrictEqual(
       {alg: 'RS256', typ: 'JWT', kid: '101'},
       decoded.header
@@ -244,7 +246,7 @@ describe('jwt', () => {
     const testDefault = 'https://example.com/';
     const got = await jwt.getRequestHeaders(testUri);
     assert.notStrictEqual(null, got, 'the creds should be present');
-    const decoded = jws.decode(got.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(got.Authorization.replace('Bearer ', ''));
     const payload = decoded.payload;
     assert.strictEqual(testDefault, payload.aud);
     assert.strictEqual(someClaim, payload.someClaim);
@@ -1035,7 +1037,10 @@ describe('jwt', () => {
     });
 
     it('returns headers from cache, prior to their expiry time', async () => {
-      const sign = sandbox.stub(jws, 'sign').returns('abc123');
+      const sign = sandbox
+        .stub(fjwt, 'createSigner')
+        // For some reason TypeScript expects a promise to be returned here
+        .returns(() => 'abc123' as unknown as Promise<string>);
       const getExpirationTime = sandbox
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .stub(jwtaccess.JWTAccess as any, 'getExpirationTime')
@@ -1056,7 +1061,10 @@ describe('jwt', () => {
     });
 
     it('creates a new self-signed JWT, if headers are close to expiring', async () => {
-      const sign = sandbox.stub(jws, 'sign').returns('abc123');
+      const sign = sandbox
+        .stub(fjwt, 'createSigner')
+        // For some reason TypeScript expects a promise to be returned here
+        .returns(() => 'abc123' as unknown as Promise<string>);
       const getExpirationTime = sandbox
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .stub(jwtaccess.JWTAccess as any, 'getExpirationTime')

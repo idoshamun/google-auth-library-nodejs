@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as jws from 'jws';
+import {createSigner, JwtHeader} from 'fast-jwt';
 import * as LRU from 'lru-cache';
 import * as stream from 'stream';
 
 import {JWTInput} from './credentials';
 import {Headers} from './oauth2client';
 
-const DEFAULT_HEADER: jws.Header = {
+const DEFAULT_HEADER: JwtHeader = {
   alg: 'RS256',
   typ: 'JWT',
 };
@@ -156,7 +156,8 @@ export class JWTAccess {
     const payload = Object.assign(defaultClaims, additionalClaims);
 
     // Sign the jwt and add it to the cache
-    const signedJWT = jws.sign({header, payload, secret: this.key});
+    const signer = createSigner({header, key: this.key as string});
+    const signedJWT = signer(payload);
     const headers = {Authorization: `Bearer ${signedJWT}`};
     this.cache.set(key, {
       expiration: exp * 1000,

@@ -14,8 +14,8 @@
 
 import * as assert from 'assert';
 import {describe, it, beforeEach, afterEach} from 'mocha';
+import {createDecoder} from 'fast-jwt';
 import * as fs from 'fs';
-import * as jws from 'jws';
 import * as sinon from 'sinon';
 
 import {JWTAccess} from '../src';
@@ -32,6 +32,7 @@ describe('jwtaccess', () => {
     client_id: 'client123',
     type: 'service_account',
   };
+  const jwtDecoder = createDecoder({complete: true});
 
   const keys = keypair(512 /* bitsize of private key */);
   const testUri = 'http:/example.com/my_test_service';
@@ -48,7 +49,7 @@ describe('jwtaccess', () => {
     const client = new JWTAccess(email, keys.private);
     const headers = client.getRequestHeaders(testUri);
     assert.notStrictEqual(null, headers, 'an creds object should be present');
-    const decoded = jws.decode(headers.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(headers.Authorization.replace('Bearer ', ''));
     assert.deepStrictEqual({alg: 'RS256', typ: 'JWT'}, decoded.header);
     const payload = decoded.payload;
     assert.strictEqual(email, payload.iss);
@@ -59,7 +60,7 @@ describe('jwtaccess', () => {
   it('getRequestHeaders should sign with scopes if user supplied scopes', () => {
     const client = new JWTAccess(email, keys.private);
     const headers = client.getRequestHeaders(testUri, undefined, 'myfakescope');
-    const decoded = jws.decode(headers.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(headers.Authorization.replace('Bearer ', ''));
     const payload = decoded.payload;
     assert.strictEqual('myfakescope', payload.scope);
   });
@@ -67,7 +68,7 @@ describe('jwtaccess', () => {
   it('getRequestHeaders should sign with default if user did not supply scopes', () => {
     const client = new JWTAccess(email, keys.private);
     const headers = client.getRequestHeaders(testUri);
-    const decoded = jws.decode(headers.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(headers.Authorization.replace('Bearer ', ''));
     const payload = decoded.payload;
     assert.strictEqual(testUri, payload.aud);
   });
@@ -75,7 +76,7 @@ describe('jwtaccess', () => {
   it('getRequestHeaders should set key id in header when available', () => {
     const client = new JWTAccess(email, keys.private, '101');
     const headers = client.getRequestHeaders(testUri);
-    const decoded = jws.decode(headers.Authorization.replace('Bearer ', ''));
+    const decoded = jwtDecoder(headers.Authorization.replace('Bearer ', ''));
     assert.deepStrictEqual(
       {alg: 'RS256', typ: 'JWT', kid: '101'},
       decoded.header
